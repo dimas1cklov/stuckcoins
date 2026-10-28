@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Coin Stack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800;900&display=swap">
+<style>
+  :root {
+    --page: #F1F1F2;
+    --bg: #FFFFFF;
+    --ink: #161823;
+    --mute: #86878B;
+    --line: #E8E8EA;
+    --soft: #F5F5F6;
+    --cyan: #25F4EE;
+    --pink: #FE2C55;
+    --font: 'Figtree', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 14% 18%, rgba(37, 244, 238, .38), transparent 42%),
+      radial-gradient(circle at 88% 82%, rgba(254, 44, 85, .30), transparent 42%),
+      var(--page);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  [hidden] { display: none !important; }
+  .svg-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+  /* ---------- Phone frame ---------- */
+  .phone {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-height: 840px;
+    max-width: 100%;
+    aspect-ratio: 9 / 19.5;
+    overflow: hidden;
+    border-radius: 34px;
+    background:
+      radial-gradient(circle at 10% 6%, rgba(37, 244, 238, .24), transparent 44%),
+      radial-gradient(circle at 94% 24%, rgba(254, 44, 85, .17), transparent 42%),
+      radial-gradient(rgba(22, 24, 35, .075) 1.2px, transparent 1.5px) 0 0 / 22px 22px,
+      var(--bg);
+    box-shadow: 0 0 0 1px var(--line), 0 24px 60px rgba(22, 24, 35, .14);
+  }
+
+  /* On a real phone: fill the whole screen, no frame */
+  @media (max-width: 500px) {
+    body { padding: 0; }
+    .phone { max-height: none; width: 100%; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+  }
+
+  /* ---------- Background layers ---------- */
+  .page-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .phone-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+
+  .blob { position: absolute; border-radius: 50%; filter: blur(38px); }
+  .blob.cyan {
+    width: 70%; aspect-ratio: 1; left: -20%; top: 12%;
+    background: radial-gradient(circle, rgba(37, 244, 238, .30), transparent 68%);
+    animation: drift 16s ease-in-out infinite alternate;
+  }
+  .blob.pink {
+    width: 64%; aspect-ratio: 1; right: -22%; top: 46%;
+    background: radial-gradient(circle, rgba(254, 44, 85, .22), transparent 68%);
+    animation: drift 19s ease-in-out -6s infinite alternate-reverse;
+  }
+
+  .bg-coin {
+    position: absolute; top: 0; left: 0;
+    will-change: transform;
+    animation: fall var(--dur) linear var(--delay) infinite;
+  }
+  .bg-coin.fly { animation-name: fly; }
+  .bg-coin svg { display: block; width: 100%; height: auto; }
+
+  .spark { position: absolute; animation: twinkle var(--dur) ease-in-out var(--delay) infinite; }
+
+  /* ---------- Top bar ---------- */
+  .top, .hud, .floor { position: relative; z-index: 1; }
+
+  .top { display: flex; justify-content: flex-end; padding: 16px 16px 0; }
+  .balance {
+    display: flex; align-items: center; gap: 6px;
+    height: 32px; padding: 0 12px 0 8px;
+    border-radius: 16px;
+    background: var(--soft);
+    font-size: 15px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .balance svg { width: 18px; height: 18px; }
+  .balance.bump { animation: bump .3s ease-out; }
+
+  .hud { padding: 14px 16px 0; text-align: center; }
+  .hud h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.01em; }
+  .hud p { margin: 4px 0 0; color: var(--mute); font-size: 14px; font-weight: 600; }
+
+  /* ---------- Play area ---------- */
+  .arena { position: relative; z-index: 1; flex: 1; min-height: 0; }
+  .arena::before {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 0; height: 46%;
+    background: radial-gradient(ellipse 60% 55% at 50% 100%, rgba(242, 194, 48, .28), transparent 70%);
+    pointer-events: none;
+  }
+
+  .hint {
+    position: absolute; left: 0; right: 0; top: 46%;
+    text-align: center;
+    color: var(--mute); font-size: 14px; font-weight: 700;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  .coin {
+    position: absolute; top: 0; left: 0;
+    pointer-events: none;
+    will-change: transform;
+    filter: drop-shadow(0 3px 3px rgba(150, 110, 10, .22));
+  }
+  .coin svg { display: block; width: 100%; height: auto; transform-origin: 50% 100%; }
+  .coin.landed svg { animation: squash .28s ease-out; }
+
+  .pop {
+    position: absolute; left: 50%; z-index: 100;
+    white-space: nowrap;
+    font-size: 22px; font-weight: 900; letter-spacing: -.01em;
+    text-shadow: -1.5px -1.5px 0 var(--cyan), 1.5px 1.5px 0 var(--pink);
+    pointer-events: none;
+    animation: rise .9s ease-out forwards;
+  }
+
+  /* ---------- Bottom TAP button ---------- */
+  .floor {
+    display: grid; place-items: center;
+    height: 128px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(245, 245, 246, .82);
+    border-top: 1px solid var(--line);
+  }
+  .tap {
+    width: min(72%, 260px); height: 56px;
+    border: 0; border-radius: 10px;
+    background: var(--ink); color: #fff;
+    font-family: var(--font); font-size: 18px; font-weight: 800; letter-spacing: .1em;
+    box-shadow: -3px -3px 0 var(--cyan), 3px 3px 0 var(--pink);
+    cursor: pointer;
+    transition: transform .08s;
+  }
+  .tap:active { transform: translate(1px, 1px); }
+
+  /* ---------- Confetti + win sheet ---------- */
+  .confetti { position: absolute; inset: 0; z-index: 50; width: 100%; height: 100%; pointer-events: none; }
+
+  .scrim {
+    position: absolute; inset: 0; z-index: 20;
+    background: rgba(22, 24, 35, .5);
+    opacity: 0; pointer-events: none;
+    transition: opacity .35s;
+  }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 30;
+    padding: 12px 22px calc(26px + env(safe-area-inset-bottom, 0px));
+    border-radius: 28px 28px 0 0;
+    background: var(--bg);
+    text-align: center;
+    box-shadow: 0 -10px 40px rgba(22, 24, 35, .18);
+    transform: translateY(105%);
+    transition: transform .55s cubic-bezier(.2, .9, .25, 1.08);
+  }
+  .sheet.show { transform: translateY(0); }
+  .grab { width: 38px; height: 4px; margin: 0 auto 18px; border-radius: 2px; background: var(--line); }
+
+  .eyebrow { margin: 0; color: var(--pink); font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .sheet h2 { margin: 8px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -.01em; }
+  .sheet h2.big {
+    font-size: 44px; font-weight: 900; letter-spacing: .01em;
+    text-shadow: -2.5px -2.5px 0 var(--cyan), 2.5px 2.5px 0 var(--pink);
+  }
+  .sub { margin: 8px 0 0; color: var(--mute); font-size: 15px; font-weight: 600; line-height: 1.45; }
+  .sub b { color: var(--ink); font-weight: 800; }
+
+  .prize {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-top: 10px;
+    font-size: 56px; font-weight: 900; letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .prize svg { flex: none; width: 46px; height: 46px; }
+
+  .btn {
+    display: block; width: 100%; height: 52px; margin-top: 20px;
+    border: 0; border-radius: 10px;
+    background: var(--pink); color: #fff;
+    font-family: var(--font); font-size: 17px; font-weight: 800;
+    cursor: pointer;
+  }
+  .btn.dark { background: var(--ink); }
+  .btn:disabled { background: var(--soft); color: #B7B8BC; cursor: not-allowed; }
+
+  .field {
+    display: flex; align-items: center; gap: 6px;
+    height: 52px; margin-top: 18px; padding: 0 14px;
+    border: 2px solid transparent; border-radius: 10px;
+    background: var(--soft);
+  }
+  .field:focus-within { border-color: var(--ink); background: #fff; }
+  .field span { color: var(--mute); font-size: 18px; font-weight: 800; }
+  .field input {
+    flex: 1; min-width: 0;
+    border: 0; outline: 0; background: transparent;
+    color: var(--ink);
+    font-family: var(--font); font-size: 16px; font-weight: 700;
+    -webkit-user-select: text; user-select: text;
+  }
+
+  .spinner {
+    width: 44px; height: 44px; margin: 20px auto 6px;
+    border: 4px solid var(--line); border-top-color: var(--pink); border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  .progress { height: 6px; margin-top: 18px; border-radius: 3px; background: var(--soft); overflow: hidden; }
+  .progress i {
+    display: block; width: 0; height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--pink));
+    transition: width var(--load-time, 3.8s) linear;
+  }
+
+  .tap:focus-visible, .btn:focus-visible { outline: 3px solid var(--cyan); outline-offset: 4px; }
+
+  /* ---------- Animations ---------- */
+  @keyframes fall    { from { transform: translate3d(0, -140px, 0) rotate(0); } to { transform: translate3d(var(--dx), var(--dist), 0) rotate(var(--rot)); } }
+  @keyframes fly     { from { transform: translate3d(var(--x0), var(--y0), 0) rotate(0); } to { transform: translate3d(var(--x1), var(--y1), 0) rotate(var(--rot)); } }
+  @keyframes drift   { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(28px, -34px, 0) scale(1.12); } }
+  @keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(.4) rotate(0); } 50% { opacity: var(--op); transform: scale(1) rotate(45deg); } }
+  @keyframes bump    { 40% { transform: scale(1.14); } }
+  @keyframes squash  { 40% { transform: scaleY(.8); } }
+  @keyframes rise    { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.8); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -36px); } }
+  @keyframes pulse   { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+  @keyframes spin    { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Coin graphics, reused everywhere with <use href="#..."> -->
+<svg class="svg-defs" aria-hidden="true">
+  <defs>
+    <linearGradient id="coin-side" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#C98F12"/>
+      <stop offset=".5" stop-color="#F2C230"/>
+      <stop offset="1" stop-color="#B9800C"/>
+    </linearGradient>
+    <radialGradient id="coin-top" cx=".4" cy=".35" r=".8">
+      <stop offset="0" stop-color="#FFE98A"/>
+      <stop offset="1" stop-color="#F0B921"/>
+    </radialGradient>
+    <symbol id="coin" viewBox="0 0 120 38">
+      <ellipse cx="60" cy="25" rx="58" ry="12" fill="url(#coin-side)"/>
+      <rect x="2" y="13" width="116" height="12" fill="url(#coin-side)"/>
+      <ellipse cx="60" cy="13" rx="58" ry="12" fill="url(#coin-top)"/>
+      <ellipse cx="60" cy="13" rx="46" ry="8.5" fill="none" stroke="#D49A12" stroke-width="2" opacity=".7"/>
+      <ellipse cx="60" cy="11" rx="26" ry="3.6" fill="#FFFFFF" opacity=".28"/>
+    </symbol>
+    <symbol id="coin-icon" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="11" fill="#F2C230" stroke="#C98F12" stroke-width="1.6"/>
+      <circle cx="12" cy="12" r="7" fill="none" stroke="#C98F12" stroke-width="1.4" opacity=".75"/>
+      <path d="M8.5 8.2c1.2-.9 2.4-1.3 3.5-1.3" stroke="#FFF3B0" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="page-bg" id="pageBg"><i class="blob cyan"></i><i class="blob pink"></i></div>
+
+<main class="phone" id="phone">
+  <div class="phone-bg" id="phoneBg"><i class="blob cyan"></i><i class="blob pink"></i></div>
+
+  <header class="top">
+    <div class="balance" id="balanceChip">
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <defs><clipPath id="hdr-clip"><circle cx="12" cy="12" r="11"/></clipPath></defs>
+        <image href="https://i.ibb.co/9mNm5Lpx/photo-2026-10-27-15-43-37.jpg" width="22" height="22" x="1" y="1" preserveAspectRatio="xMidYMid slice" clip-path="url(#hdr-clip)"/>
+        <circle cx="12" cy="12" r="11" fill="none" stroke="#C98F12" stroke-width="1.6"/>
+      </svg>
+      <span id="balance">300</span>
+    </div>
+  </header>
+
+  <section class="hud">
+    <h1>Stack the coins</h1>
+    <p id="counter">Coin 1 / 6</p>
+  </section>
+
+  <div class="arena" id="arena">
+    <div class="hint" id="hint">Tap to drop the coin</div>
+  </div>
+
+  <footer class="floor">
+    <button class="tap" id="tapBtn" type="button">TAP</button>
+  </footer>
+
+  <canvas class="confetti" id="confetti"></canvas>
+  <div class="scrim" id="scrim"></div>
+  <section class="sheet" id="sheet">
+    <div class="grab"></div>
+    <div id="sheetContent"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= SETTINGS ================= */
+  var SETTINGS = {
+    coinsToStack: 6,         // how many coins the player stacks
+    startBalance: 300,       // balance shown in the top-right corner
+    perCoin: 10,             // +N for each landed coin
+    prizeMin: 20000,         // smallest possible prize
+    prizeMax: 35000,         // biggest possible prize
+    loadingMs: 3800,         // fake "sending coins" loading time
+    loadingSteps: ['Verifying account', 'Sending coins', 'Almost done']
+  };
+  /* ============================================ */
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var phone = $('phone');
+  var arena = $('arena');
+  var hint = $('hint');
+  var counter = $('counter');
+  var balanceEl = $('balance');
+  var balanceChip = $('balanceChip');
+  var scrim = $('scrim');
+  var sheet = $('sheet');
+  var content = $('sheetContent');
+  var canvas = $('confetti');
+  var ctx = canvas.getContext('2d');
+
+  var COIN_SVG = '<svg viewBox="0 0 120 38"><use href="#coin"/></svg>';
+  var NEW_COIN_SVG = '<svg viewBox="0 0 120 38"><ellipse cx="60" cy="25" rx="58" ry="12" fill="url(#coin-side)"/><rect x="2" y="13" width="116" height="12" fill="url(#coin-side)"/><defs><clipPath id="top-clip"><ellipse cx="60" cy="13" rx="58" ry="12"/></clipPath></defs><image href="https://i.ibb.co/9mNm5Lpx/photo-2026-10-27-15-43-37.jpg" width="116" height="24" x="2" y="1" preserveAspectRatio="none" clip-path="url(#top-clip)"/><ellipse cx="60" cy="13" rx="58" ry="12" fill="none" stroke="#D49A12" stroke-width="2" opacity=".7"/></svg>';
+  var COIN_ICON = '<svg viewBox="0 0 24 24"><defs><clipPath id="prz-clip"><circle cx="12" cy="12" r="11"/></clipPath></defs><image href="https://i.ibb.co/9mNm5Lpx/photo-2026-10-27-15-43-37.jpg" width="22" height="22" x="1" y="1" preserveAspectRatio="xMidYMid slice" clip-path="url(#prz-clip)"/><circle cx="12" cy="12" r="11" fill="none" stroke="#C98F12" stroke-width="1.6"/></svg>';
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
+  function setPos(el, x, y) { el.style.transform = 'translate(' + x + 'px,' + y + 'px)'; }
+
+  /* ================= GAME ================= */
+  var W = 0, H = 0;                 // arena size
+  var coinW = 120, coinH = 38;      // coin size
+  var stepY = 13;                   // vertical step between stacked coins
+  var moveY = 0;                    // height where the coin slides
+  var FLOOR_GAP = 10;
+
+  var state = 'move';               // move | drop | wait | won
+  var stacked = [];                 // coins already on the stack
+  var current = null;               // the sliding coin
+  var x = 0, dir = 1, speed = 0;
+  var drop = null;
+  var balance = SETTINGS.startBalance;
+  var prize = 0;
+  var nickname = '';
+  var lastTime = 0;
+
+  function measure() {
+    W = arena.clientWidth;
+    H = arena.clientHeight;
+    coinW = Math.min(128, Math.round(W * 0.34));
+    var k = coinW / 120;
+    coinH = 38 * k;
+    stepY = 13 * k;
+    moveY = Math.max(10, H * 0.14);
+
+    stacked.forEach(function (c, i) {
+      c.el.style.width = coinW + 'px';
+      setPos(c.el, (W - coinW) / 2 + c.offset, H - FLOOR_GAP - coinH - i * stepY);
+    });
+    if (current) {
+      current.style.width = coinW + 'px';
+      if (state === 'move') setPos(current, x, moveY);
+    }
+  }
+
+  function spawnCoin() {
+    current = document.createElement('div');
+    current.className = 'coin';
+    current.style.width = coinW + 'px';
+    current.style.zIndex = 10 + stacked.length;
+    current.innerHTML = NEW_COIN_SVG;
+    arena.appendChild(current);
+
+    x = Math.random() < 0.5 ? 0 : W - coinW;
+    dir = x === 0 ? 1 : -1;
+    speed = (210 + stacked.length * 35) * (W / 360);
+    state = 'move';
+    setPos(current, x, moveY);
+    counter.textContent = 'Coin ' + (stacked.length + 1) + ' / ' + SETTINGS.coinsToStack;
+  }
+
+  function dropCoin() {
+    if (state !== 'move') return;
+    state = 'drop';
+    hint.hidden = true;
+
+    var center = (W - coinW) / 2;
+    var offset = x - center;
+    var limit = coinW * 0.09;   // the coin always lands, only slightly off-center
+
+    drop = {
+      t: 0,
+      x0: x, y0: moveY,
+      x1: center + Math.max(-limit, Math.min(limit, offset * 0.12)),
+      y1: H - FLOOR_GAP - coinH - stacked.length * stepY,
+      perfect: Math.abs(offset) < coinW * 0.22
+    };
+  }
+
+  function showPop(text, y) {
+    var el = document.createElement('div');
+    el.className = 'pop';
+    el.textContent = text;
+    el.style.top = Math.max(0, y - 34) + 'px';
+    arena.appendChild(el);
+    setTimeout(function () { el.remove(); }, 950);
+  }
+
+  function landCoin() {
+    setPos(current, drop.x1, drop.y1);
+    current.classList.add('landed');
+    stacked.push({ el: current, offset: drop.x1 - (W - coinW) / 2 });
+    current = null;
+    state = 'wait';
+
+    balance += SETTINGS.perCoin;
+    balanceEl.textContent = fmt(balance);
+    balanceChip.classList.remove('bump');
+    void balanceChip.offsetWidth;
+    balanceChip.classList.add('bump');
+
+    showPop((drop.perfect ? 'Perfect! +' : 'Nice! +') + SETTINGS.perCoin, drop.y1);
+
+    if (stacked.length >= SETTINGS.coinsToStack) setTimeout(win, 650);
+    else setTimeout(spawnCoin, 200);
+  }
+
+  function gameLoop(time) {
+    var dt = Math.min(0.05, (time - lastTime) / 1000 || 0);
+    lastTime = time;
+
+    if (state === 'move' && current) {
+      x += dir * speed * dt;
+      var maxX = W - coinW;
+      if (x < 0) { x = 0; dir = 1; }
+      if (x > maxX) { x = maxX; dir = -1; }
+      setPos(current, x, moveY);
+    }
+
+    if (state === 'drop' && current) {
+      drop.t = Math.min(1, drop.t + dt / 0.32);
+      var p = drop.t;
+      var ex = 1 - Math.pow(1 - p, 3);
+      var ey = p * p;
+      setPos(current, drop.x0 + (drop.x1 - drop.x0) * ex, drop.y0 + (drop.y1 - drop.y0) * ey);
+      if (p >= 1) landCoin();
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  /* ================= CONFETTI ================= */
+  var COLORS = ['#25F4EE', '#FE2C55', '#161823', '#FFD84D'];
+  var pieces = [];
+  var raining = false;
+  var confettiRunning = false;
+
+  function resizeCanvas() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(phone.clientWidth * dpr);
+    canvas.height = Math.round(phone.clientHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function newPiece(px, py, vx, vy) {
+    return {
+      x: px, y: py, vx: vx, vy: vy,
+      w: rand(6, 12), h: rand(3, 8),
+      r: rand(0, 6.28), vr: rand(-0.25, 0.25),
+      c: COLORS[Math.floor(Math.random() * COLORS.length)]
+    };
+  }
+
+  function burst(count) {
+    var w = phone.clientWidth, h = phone.clientHeight;
+    for (var i = 0; i < count; i++) {
+      var left = i % 2 === 0;
+      pieces.push(newPiece(
+        left ? -6 : w + 6,
+        h * rand(0.45, 0.6),
+        (left ? 1 : -1) * rand(5, 14),
+        -rand(9, 22)
+      ));
+    }
+    runConfetti();
+  }
+
+  function startRain() { raining = true; runConfetti(); }
+  function stopRain() { raining = false; }
+
+  function runConfetti() {
+    if (confettiRunning) return;
+    confettiRunning = true;
+    requestAnimationFrame(confettiLoop);
+  }
+
+  function confettiLoop() {
+    var w = phone.clientWidth, h = phone.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    if (raining) {
+      var n = Math.random() < 0.5 ? 2 : 1;
+      for (var i = 0; i < n; i++) pieces.push(newPiece(rand(0, w), -10, rand(-1.2, 1.2), rand(1, 4)));
+    }
+
+    pieces = pieces.filter(function (p) {
+      p.vy = Math.min(7, p.vy + 0.3);
+      p.vx *= 0.992;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.r += p.vr;
+      if (p.y > h + 20) return false;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r);
+      ctx.fillStyle = p.c;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+      return true;
+    });
+
+    if (pieces.length || raining) requestAnimationFrame(confettiLoop);
+    else confettiRunning = false;
+  }
+
+  /* ================= WIN FLOW ================= */
+  function openSheet() { scrim.classList.add('show'); sheet.classList.add('show'); }
+  function closeSheet() { scrim.classList.remove('show'); sheet.classList.remove('show'); }
+
+  function countUp(el, to, ms) {
+    var start = performance.now();
+    (function tick(now) {
+      var p = Math.min(1, (now - start) / ms);
+      el.textContent = fmt(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(tick);
+    })(start);
+  }
+
+  function win() {
+    state = 'won';
+    prize = Math.round(rand(SETTINGS.prizeMin, SETTINGS.prizeMax) / 50) * 50;
+
+    burst(80);
+    setTimeout(function () { burst(60); }, 350);
+    startRain();
+
+    showWonScreen();
+    openSheet();
+  }
+
+  // Screen 1: YOU WON + prize + Claim
+  function showWonScreen() {
+    content.innerHTML =
+      '<p class="eyebrow">Reward unlocked</p>' +
+      '<h2 class="big">YOU WON!</h2>' +
+      '<div class="prize">' + COIN_ICON + '<span id="prizeNum">0</span></div>' +
+      '<p class="sub">coins from your stack</p>' +
+      '<button class="btn" id="claimBtn" type="button">Claim</button>';
+
+    countUp($('prizeNum'), prize, 1600);
+    $('claimBtn').onclick = function () {
+      stopRain();             // confetti stops on Claim
+      showNicknameScreen();
+    };
+  }
+
+  // Screen 2: enter username
+  function showNicknameScreen() {
+    content.innerHTML =
+      '<p class="eyebrow">Last step</p>' +
+      '<h2>Enter your username</h2>' +
+      '<p class="sub">We will send <b>' + fmt(prize) + '</b> coins to this account.</p>' +
+      '<label class="field"><span>@</span>' +
+        '<input id="nickInput" type="text" maxlength="24" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="username">' +
+      '</label>' +
+      '<button class="btn" id="confirmBtn" type="button" disabled>Confirm</button>';
+
+    var input = $('nickInput');
+    var btn = $('confirmBtn');
+
+    input.addEventListener('input', function () {
+      input.value = input.value.replace(/[^A-Za-z0-9_.]/g, '');
+      btn.disabled = input.value.length < 2;
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !btn.disabled) btn.click();
+    });
+    btn.onclick = function () {
+      nickname = input.value;
+      showLoadingScreen();
+    };
+
+    setTimeout(function () { input.focus({ preventScroll: true }); }, 400);
+  }
+
+  // Screen 3: fake loading
+  function showLoadingScreen() {
+    content.innerHTML =
+      '<div class="spinner"></div>' +
+      '<h2 id="loadTitle">' + SETTINGS.loadingSteps[0] + '</h2>' +
+      '<p class="sub">@<b id="loadNick"></b></p>' +
+      '<div class="progress" style="--load-time:' + SETTINGS.loadingMs + 'ms"><i id="loadBar"></i></div>';
+
+    $('loadNick').textContent = nickname;
+    var title = $('loadTitle');
+    var bar = $('loadBar');
+    var steps = SETTINGS.loadingSteps;
+
+    setTimeout(function () { bar.style.width = '100%'; }, 40);
+    steps.forEach(function (text, i) {
+      if (i === 0) return;
+      setTimeout(function () { title.textContent = text; }, SETTINGS.loadingMs * i / steps.length);
+    });
+    setTimeout(showGotchaScreen, SETTINGS.loadingMs);
+  }
+
+  // Screen 4: prank reveal
+  function showGotchaScreen() {
+    content.innerHTML =
+      '<h2 class="big">GOTCHA!</h2>' +
+      '<p class="sub">It was a prank, @<b id="gotNick"></b>. No coins were sent and your username was not saved anywhere.</p>' +
+      '<button class="btn dark" id="againBtn" type="button">Play again</button>';
+
+    $('gotNick').textContent = nickname;
+    $('againBtn').onclick = restart;
+    burst(60);
+  }
+
+  function restart() {
+    stopRain();
+    closeSheet();
+    stacked.forEach(function (c) { c.el.remove(); });
+    if (current) current.remove();
+    stacked = [];
+    current = null;
+    nickname = '';
+    balance = SETTINGS.startBalance;
+    balanceEl.textContent = fmt(balance);
+    hint.hidden = false;
+    setTimeout(spawnCoin, 300);
+  }
+
+  /* ================= BACKGROUND ================= */
+  // Blurred falling coins
+  function addFallingCoins(box, count, big) {
+    for (var i = 0; i < count; i++) {
+      var depth = Math.random();
+      var nearEdge = depth > 0.5 && !big;    // close coins stay at the sides, center stays clean
+      var el = document.createElement('div');
+      el.className = 'bg-coin';
+      el.innerHTML = COIN_SVG;
+      el.style.left = (nearEdge ? (Math.random() < 0.5 ? rand(-10, 8) : rand(84, 104)) : rand(-6, 100)) + '%';
+      el.style.width = ((big ? 46 : 24) + depth * (big ? 120 : 52)) + 'px';
+      el.style.filter = 'blur(' + ((big ? 2 : 1.5) + depth * (big ? 8 : 4.5)) + 'px)';
+      el.style.opacity = (big ? 0.5 : 0.22) + depth * (big ? 0.2 : 0.16);
+      el.style.setProperty('--dur', (15 - depth * 7 + rand(0, 4)) + 's');
+      el.style.setProperty('--delay', -rand(0, 18) + 's');
+      el.style.setProperty('--dx', rand(-1, 1) * (nearEdge ? 40 : 90) + 'px');
+      el.style.setProperty('--rot', (Math.random() < 0.5 ? -1 : 1) * rand(180, 520) + 'deg');
+      box.appendChild(el);
+    }
+  }
+
+  // Blurred coins flying sideways across the screen
+  function addFlyingCoins(box, count, w, h, big) {
+    for (var i = 0; i < count; i++) {
+      var toRight = Math.random() < 0.5;
+      var size = (big ? 40 : 22) + rand(0, big ? 70 : 30);
+      var el = document.createElement('div');
+      el.className = 'bg-coin fly';
+      el.innerHTML = COIN_SVG;
+      el.style.width = size + 'px';
+      el.style.filter = 'blur(' + rand(big ? 3 : 2, big ? 8 : 4) + 'px)';
+      el.style.opacity = rand(big ? 0.35 : 0.18, big ? 0.55 : 0.3);
+      el.style.setProperty('--dur', rand(18, 32) + 's');
+      el.style.setProperty('--delay', -rand(0, 28) + 's');
+      el.style.setProperty('--x0', (toRight ? -size - 60 : w + 60) + 'px');
+      el.style.setProperty('--x1', (toRight ? w + 60 : -size - 60) + 'px');
+      el.style.setProperty('--y0', rand(0.08, 0.7) * h + 'px');
+      el.style.setProperty('--y1', rand(0.2, 0.95) * h + 'px');
+      el.style.setProperty('--rot', (toRight ? 1 : -1) * rand(240, 600) + 'deg');
+      box.appendChild(el);
+    }
+  }
+
+  // Small twinkling sparkles
+  function addSparkles(box, count) {
+    var colors = ['#25F4EE', '#FE2C55', '#F2C230'];
+    for (var i = 0; i < count; i++) {
+      var size = rand(7, 14);
+      var el = document.createElement('div');
+      el.className = 'spark';
+      el.style.left = rand(2, 96) + '%';
+      el.style.top = rand(2, 92) + '%';
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.color = colors[i % colors.length];
+      el.style.setProperty('--dur', rand(3, 6) + 's');
+      el.style.setProperty('--delay', -rand(0, 6) + 's');
+      el.style.setProperty('--op', rand(0.3, 0.6));
+      el.innerHTML = '<svg viewBox="0 0 20 20" width="100%" height="100%"><path d="M10 0C10.8 6.4 13.6 9.2 20 10C13.6 10.8 10.8 13.6 10 20C9.2 13.6 6.4 10.8 0 10C6.4 9.2 9.2 6.4 10 0Z" fill="currentColor"/></svg>';
+      box.appendChild(el);
+    }
+  }
+
+  function setFallDistance() {
+    $('phoneBg').style.setProperty('--dist', phone.clientHeight + 160 + 'px');
+    $('pageBg').style.setProperty('--dist', window.innerHeight + 220 + 'px');
+  }
+
+  /* ================= CONTROLS ================= */
+  arena.addEventListener('pointerdown', dropCoin);
+  $('tapBtn').addEventListener('pointerdown', function (e) { e.preventDefault(); dropCoin(); });
+  $('tapBtn').addEventListener('click', function (e) { if (e.detail === 0) dropCoin(); }); // keyboard Enter
+  document.addEventListener('keydown', function (e) {
+    var tag = document.activeElement.tagName;
+    if (e.code === 'Space' && tag !== 'INPUT' && tag !== 'BUTTON') {
+      e.preventDefault();
+      dropCoin();
+    }
+  });
+
+  window.addEventListener('resize', function () {
+    measure();
+    resizeCanvas();
+    setFallDistance();
+  });
+
+  /* ================= START ================= */
+  measure();
+  resizeCanvas();
+
+  addFallingCoins($('phoneBg'), 9, false);
+  addFlyingCoins($('phoneBg'), 3, phone.clientWidth, phone.clientHeight, false);
+  addSparkles($('phoneBg'), 14);
+  addFallingCoins($('pageBg'), 10, true);
+  addFlyingCoins($('pageBg'), 4, window.innerWidth, window.innerHeight, true);
+  setFallDistance();
+
+  spawnCoin();
+  requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
